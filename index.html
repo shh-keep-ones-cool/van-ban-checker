@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><title>Trợ lý kiểm tra văn bản Đoàn</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{--bg:#f6f6f3;--card:#fff;--tx:#1d1d1b;--mu:#6b6b66;--bd:#dcdcd5;--ac:#1f5fbf;--er:#c0392b;--wa:#b7791f;--ok:#2e7d32;--er-bg:#fdecea;--wa-bg:#fff6e0;--ok-bg:#e8f5e9;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--card:#21211f;--tx:#ecece8;--mu:#a0a09a;--bd:#3a3a36;--ac:#6ea3f5;--er:#ff8a7a;--wa:#f0b955;--ok:#7bc67e;--er-bg:#3a1f1c;--wa-bg:#37300f;--ok-bg:#1c3320;color-scheme:dark}}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 14px 60px}h1{font-size:22px;margin:0 0 4px}.sub{color:var(--mu);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:14px}.card h2{font-size:16px;margin:0 0 4px}.h,.muted{color:var(--mu);font-size:13px}.h{margin:0 0 12px}
+.num{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--ac);color:#fff;font-size:13px;align-items:center;justify-content:center;margin-right:8px}
+button,.btn{font:inherit;background:var(--ac);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer}button.sec{background:transparent;color:var(--ac);border:1px solid var(--ac)}button:disabled{opacity:.4;cursor:not-allowed}
+input[type=file]{display:none}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rule{display:flex;gap:8px;padding:5px 0;border-bottom:1px dashed var(--bd);font-size:14px}.rule:last-child{border:0}.tag{font-size:11px;border-radius:4px;padding:1px 6px;background:var(--bd);color:var(--mu);white-space:nowrap}
+.iss{border-radius:8px;padding:9px 11px;margin:8px 0;font-size:14px}.iss.err{background:var(--er-bg);border-left:4px solid var(--er)}.iss.warn{background:var(--wa-bg);border-left:4px solid var(--wa)}
+.iss div{color:var(--mu);font-size:13px;margin-top:2px}.iss b.k{color:var(--tx)}code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+.gate{border-radius:10px;padding:12px 14px;font-weight:600;margin-bottom:10px}.gate.bad{background:var(--er-bg);color:var(--er)}.gate.good{background:var(--ok-bg);color:var(--ok)}
+.conf label{display:block;padding:4px 0;font-size:14px}pre{white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;font-size:12.5px}details summary{cursor:pointer;font-weight:600;font-size:14px}
+</style></head><body><main>
+<h1>📝 Trợ lý kiểm tra văn bản Đoàn</h1>
+<p class="sub">Hệ thống chỉ chỉ ra lỗi và cách sửa. Bạn tự sửa trong Word rồi nạp lại. Hệ thống không sửa file và không viết hộ nội dung.</p>
+
+<div class="card"><h2><span class="num">1</span>Bộ quy tắc đang áp dụng</h2>
+<p class="h">Nguồn: Hướng dẫn 29-HD/TWĐTN-VP về thể thức văn bản của Đoàn TNCS Hồ Chí Minh. Có thể tắt quy tắc không cần.</p>
+<details><summary>Xem / bật tắt quy tắc</summary><div id="rules"></div></details></div>
+
+<div class="card"><h2><span class="num">2</span>Nạp văn bản của bạn (.docx)</h2>
+<p class="h">Sửa xong trong Word thì nạp lại, hệ thống sẽ cho biết bạn đã sửa được bao nhiêu lỗi.</p>
+<div class="row"><label class="btn">Chọn file .docx<input type="file" id="fS" accept=".docx"></label><button class="sec" id="bDemo">Chạy thử văn bản demo lỗi</button><span class="muted" id="sName"></span></div></div>
+<div id="res"></div>
+
+<div class="card"><h2><span class="num">AI</span>Gợi ý từ AI (Gemini)</h2>
+<p class="h">AI chỉ gắn cờ mâu thuẫn, ý mơ hồ, văn phong, chính tả và giải thích vì sao. AI không viết lại và không sửa văn bản. Số điện thoại, email được che trước khi gửi.</p>
+<div class="row"><button class="sec" id="bAI">Nhờ AI xem nội dung</button><span class="muted" id="aiNote"></span></div><div id="ai"></div></div>
+</main>
+<script>
+// ====== ĐIỀN LINK WORKER (Cloudflare) VÀO ĐÂY ======
+const AI_URL=""; // ví dụ: "https://vanban-ai.ten-ban.workers.dev"
+// ====================================================
+let CUR=null;
+const W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',$=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const at=(e,n)=>e?(e.getAttributeNS(W,n)||e.getAttribute('w:'+n)):null,q=(e,t)=>e?e.getElementsByTagName('w:'+t)[0]:null;
+const norm=s=>s.toUpperCase().normalize('NFC'),mm=t=>Math.round(t/56.7*10)/10,ex=t=>esc(t.trim().slice(0,60))+(t.trim().length>60?'…':'');
+const CFG={font:'Times New Roman',body:14,m:{top:20,bottom:20,left:30,right:20},tol:3};
+const LOAI=['BÁO CÁO','KẾ HOẠCH','QUYẾT ĐỊNH','QUY ĐỊNH','CHỈ THỊ','CHƯƠNG TRÌNH','THÔNG TRI','TỜ TRÌNH','THÔNG BÁO','NGHỊ QUYẾT','KẾT LUẬN','HƯỚNG DẪN','BIÊN BẢN','GIẤY MỜI','ĐỀ ÁN'];
+const TYPE={BC:['BÁO CÁO'],KH:['KẾ HOẠCH'],QĐ:['QUYẾT ĐỊNH','QUY ĐỊNH'],CT:['CHỈ THỊ'],CTr:['CHƯƠNG TRÌNH'],TT:['THÔNG TRI'],TTr:['TỜ TRÌNH'],TB:['THÔNG BÁO'],CV:[]};
+const AGENCY=['TWĐTN','UBKTTWĐ','TĐTN','ĐTNK','ĐTNCA','BCSĐ','ĐTN','CĐCS','CĐ','PĐ','ĐH','TB','TCT','HĐ','ĐKT','BS'];
+const COMP=[['tieude',/^ĐOÀN TNCS HỒ CHÍ MINH$/,15,1,0,'Tiêu đề "ĐOÀN TNCS HỒ CHÍ MINH"'],['so',/^SỐ\s*:/,14,0,0,'Dòng Số, ký hiệu'],['ngay',/NGÀY\s+\S+\s+THÁNG/,13,0,1,'Dòng địa điểm, ngày tháng năm'],['loai',new RegExp('^('+LOAI.join('|')+')$'),16,1,0,'Tên loại văn bản'],['vv',/^["“]?V\/V\b/,12,0,1,'Trích yếu công văn (V/v)'],['kg',/^KÍNH GỬI/,14,1,0,'Dòng Kính gửi'],['nn',/^NƠI NHẬN\s*:?$/,13,1,0,'Chữ "Nơi nhận"'],['ky',/^(TM|KT|TL)\./,14,1,0,'Thể thức đề ký']];
+const RL=[
+['page','Khổ giấy A4','Định dạng','II.1','Bố cục (Layout) → Kích cỡ (Size) → A4, hướng giấy dọc.'],
+['margin','Lề trang: trên 20, dưới 20, trái 30, phải 20 mm','Định dạng','II.3','Bố cục → Lề → Lề tùy chỉnh: Trên 2 cm, Dưới 2 cm, Trái 3 cm, Phải 2 cm.'],
+['font','Phông chữ Times New Roman','Định dạng','Mẫu 3','Ctrl+A rồi chọn phông Times New Roman. Kiểm tra cả bảng và đoạn dán từ nơi khác.'],
+['bodysz','Cỡ chữ phần nội dung: 14','Định dạng','II.6','Chọn đoạn nội dung → đặt cỡ chữ 14. Cả văn bản dùng cùng một cỡ.'],
+['comp','Cỡ chữ, in đậm/nghiêng từng thành phần (tiêu đề 15, tên loại 16, ngày 13 nghiêng, Nơi nhận 13 đậm…)','Định dạng','Mẫu 3','Chọn dòng đó và đặt cỡ/kiểu chữ đúng bảng Mẫu 3.'],
+['para','Thụt đầu dòng 1,27 cm, giãn đoạn ≤ 6pt, giãn dòng 1,0–1,2, căn đều hai bên','Định dạng','II.6','Chọn nội dung → chuột phải → Đoạn (Paragraph): Căn lề = Justified, Đầu dòng đầu tiên = 1,27 cm, Sau đoạn ≤ 6pt, Giãn dòng 1,0–1,2.'],
+['head','Có tiêu đề, tên cơ quan ban hành và dòng ***','Thể thức','III.1–2','Góc trái trên cùng: tên cơ quan ban hành (BCH/CHI ĐOÀN…), dòng *** ở dưới. Góc phải: ĐOÀN TNCS HỒ CHÍ MINH.'],
+['so','Số và ký hiệu đúng dạng, ký hiệu viết hoa','Thể thức','III.3','Dạng: Số: 245-BC/TĐTN-TCKT (số-loại/cơ quan-đơn vị). Loại và cơ quan theo danh mục viết tắt của Hướng dẫn.'],
+['ngay','Địa điểm, ngày tháng năm: "Hà Nội, ngày 09 tháng 02 năm 2013"','Thể thức','III.4','Viết đủ chữ ngày/tháng/năm, không dùng / . -. Ngày dưới 10 và tháng 1, 2 phải thêm số 0.'],
+['loai','Tên loại văn bản in hoa, có trích yếu, có đường ----- bên dưới (trừ công văn)','Thể thức','III.5','Tên loại in hoa giữa trang; dòng dưới là trích yếu (Về việc…); dưới cùng là đường nét rời -----.'],
+['cv','Công văn có "V/v" và "Kính gửi:"; văn bản khác có tên loại khớp ký hiệu','Thể thức','III.5, III.8','Ký hiệu BC thì tên loại phải là BÁO CÁO, QĐ là QUYẾT ĐỊNH, v.v. Công văn không ghi tên loại.'],
+['canc','Căn cứ: cuối dòng có ";", căn cứ cuối cùng có ","','Nội dung','II.6','Sửa dấu cuối từng dòng "Căn cứ…".'],
+['muc','Mục số La Mã: tiêu đề viết in hoa','Nội dung','II.6','Ví dụ: I. MỤC ĐÍCH, YÊU CẦU.'],
+['ky','Thể thức đề ký TM./KT./TL. hoặc chức vụ in hoa','Thể thức','III.7','Ví dụ: TM. BAN CHẤP HÀNH CHI ĐOÀN, dòng dưới là BÍ THƯ.'],
+['nn','Nơi nhận: gạch đầu dòng, mỗi dòng kết thúc ";", dòng cuối ".", có "Lưu"','Thể thức','III.8','Mẫu: Nơi nhận: / - Như trên; / - Lưu VT.'],
+['trang','Đánh số trang từ trang 2, ở header, giữa','Định dạng','II.4','Chèn → Số trang → Đầu trang (Header) → giữa; tick "Trang đầu khác biệt" để trang 1 không hiện số.'],
+['ph','Không còn chỗ trống hoặc ghi chú mẫu ([...], ...., {{...}})','Nội dung','—','Điền đầy đủ hoặc xóa các ghi chú của mẫu.'],
+['date','Ngày tháng hợp lệ và hợp lý','Nội dung','III.4','Kiểm tra lại ngày tồn tại và thứ tự thời gian.'],
+['typo','Khoảng trắng, dấu câu','Chính tả','—','Dùng Ctrl+H tìm hai dấu cách liên tiếp, bỏ dấu cách trước dấu câu, thêm dấu cách sau dấu phẩy.'],
+['blank','Không để dòng trống liên tiếp','Định dạng','—','Xóa dòng trống thừa, dùng giãn đoạn thay vì nhấn Enter nhiều lần.']].map(r=>({id:r[0],label:r[1],cat:r[2],ref:r[3],tip:r[4],on:1}));
+const RB=id=>RL.find(r=>r.id===id);
+$('rules').innerHTML=RL.map((r,i)=>`<div class="rule"><input type="checkbox" checked data-i="${i}"><span style="flex:1">${esc(r.label)}</span><span class="tag">${r.cat} · ${r.ref}</span></div>`).join('');
+$('rules').querySelectorAll('input').forEach(c=>c.onchange=()=>RL[c.dataset.i].on=c.checked?1:0);
+
+async function parse(buf){
+ const z=await JSZip.loadAsync(buf),d=new DOMParser().parseFromString(await z.file('word/document.xml').async('string'),'application/xml');
+ let def={font:null,size:10};const sf=z.file('word/styles.xml');
+ if(sf){const s=new DOMParser().parseFromString(await sf.async('string'),'application/xml');
+  const ap=r=>{if(!r)return;const f=at(q(r,'rFonts'),'ascii'),sz=at(q(r,'sz'),'val');if(f)def.font=f;if(sz)def.size=sz/2};
+  ap(q(q(q(s,'docDefaults'),'rPrDefault'),'rPr'));[...s.getElementsByTagName('w:style')].filter(x=>at(x,'styleId')==='Normal').forEach(x=>ap(q(x,'rPr')))}
+ const flag=e=>e&&!['0','false'].includes(at(e,'val'));
+ const paras=[...d.getElementsByTagName('w:p')].map(p=>{
+  const runs=[];for(const r of p.getElementsByTagName('w:r')){const t=[...r.getElementsByTagName('w:t')].map(x=>x.textContent).join('');if(!t)continue;
+   const rp=q(r,'rPr'),sz=at(q(rp,'sz'),'val');runs.push({n:t.length,f:at(q(rp,'rFonts'),'ascii')||def.font||'(không rõ)',s:sz?sz/2:def.size,b:flag(q(rp,'b')),i:flag(q(rp,'i'))})}
+  const pp=q(p,'pPr'),sp=q(pp,'spacing'),ind=q(pp,'ind');
+  return{t:runs.length?[...p.getElementsByTagName('w:t')].map(x=>x.textContent).join('').replace(/\u00a0/g,' '):[...p.getElementsByTagName('w:t')].map(x=>x.textContent).join(''),runs,jc:at(q(pp,'jc'),'val'),after:at(sp,'after'),line:at(sp,'line'),rule:at(sp,'lineRule'),first:at(ind,'firstLine'),left:at(ind,'left'),num:!!q(pp,'numPr')}});
+ let pg=false;const hdr=[];for(const n of Object.keys(z.files))if(/word\/(header|footer)\d*\.xml$/.test(n)){const x=await z.file(n).async('string');if(/PAGE/.test(x))hdr.push(n.includes('header')?'header':'footer')}
+ const sp=[...d.getElementsByTagName('w:sectPr')].pop(),pz=q(sp,'pgSz'),pm=q(sp,'pgMar');
+ return{paras,text:paras.map(p=>p.t).join('\n'),fmt:true,pgnum:hdr,titlePg:!!q(sp,'titlePg'),
+  pg:pz?{w:+at(pz,'w'),h:+at(pz,'h')}:null,mg:pm?Object.fromEntries(['top','bottom','left','right'].map(k=>[k,mm(at(pm,k))])):null}}
+
+function stat(p){const n=p.runs.reduce((a,r)=>a+r.n,0)||1,sz={};p.runs.forEach(r=>sz[r.s]=(sz[r.s]||0)+r.n);
+ return{sz:+Object.entries(sz).sort((a,b)=>b[1]-a[1])[0]?.[0],b:p.runs.filter(r=>r.b).reduce((a,r)=>a+r.n,0)/n>.8,i:p.runs.filter(r=>r.i).reduce((a,r)=>a+r.n,0)/n>.8}}
+function dates(text){const o=[];let m;const a=/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/g,b=/ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})/gi;
+ for(const re of[b,a])while(m=re.exec(text)){const[dd,mo,yy]=[+m[1],+m[2],+m[3]],dt=new Date(yy,mo-1,dd);o.push({raw:m[0],ok:dt.getDate()===dd&&dt.getMonth()===mo-1,dt,doc:re===b})}return o}
+
+function check(S){
+ const I=[],on=id=>RB(id).on,add=(id,sev,msg,where)=>{if(on(id))I.push({id,sev,msg,where:where||''})};
+ const L=S.paras.filter(p=>p.t.trim()),T=norm(S.text),lines=L.map(p=>norm(p.t.trim()));
+ const idx=re=>lines.findIndex(l=>re.test(l));
+ if(S.fmt){
+  if(S.pg&&(Math.abs(S.pg.w-11906)>60||Math.abs(S.pg.h-16838)>60))add('page','err','Khổ giấy không phải A4 dọc',`Hiện ${mm(S.pg.w)}×${mm(S.pg.h)} mm, cần 210×297 mm`);
+  if(S.mg)for(const[k,l]of[['top','trên'],['bottom','dưới'],['left','trái'],['right','phải']])if(Math.abs(S.mg[k]-CFG.m[k])>CFG.tol)add('margin','err',`Lề ${l} sai`,`Hiện ${S.mg[k]} mm, chuẩn ${CFG.m[k]} mm`);
+  const bf=L.filter(p=>p.runs.some(r=>r.f!==CFG.font));if(bf.length)add('font','err',`Có ${bf.length} đoạn dùng phông khác ${CFG.font}`,bf.slice(0,4).map(p=>`<code>${ex(p.t)}</code> (${esc([...new Set(p.runs.map(r=>r.f))].join(', '))})`).join('<br>'));
+  const special=p=>COMP.some(c=>c[1].test(norm(p.t.trim())))||/^(CĂN CỨ|NƠI NHẬN|-|\*{3})/.test(norm(p.t.trim()));
+  const body=L.filter(p=>p.t.trim().length>=70&&!p.num&&!special(p)&&p.runs.length);
+  const bs=body.filter(p=>stat(p).sz!==CFG.body);if(bs.length)add('bodysz','err',`${bs.length} đoạn nội dung không đúng cỡ ${CFG.body}`,bs.slice(0,4).map(p=>`<code>${ex(p.t)}</code> (cỡ ${stat(p).sz})`).join('<br>'));
+  for(const[id,re,sz,b,i,label]of COMP){const p=L.find(p=>p.runs.length&&re.test(norm(p.t.trim())));if(!p)continue;const s=stat(p);
+   if(s.sz!==sz)add('comp','err',`${label}: cỡ chữ ${s.sz}, cần ${sz}`,`<code>${ex(p.t)}</code>`);
+   else if((b&&!s.b)||(i&&!s.i))add('comp','warn',`${label}: cần ${b?'in đậm':''}${b&&i?' và ':''}${i?'in nghiêng':''}`,`<code>${ex(p.t)}</code> (nếu đã đặt bằng Style thì kiểm tra bằng mắt)`)}
+  const g={ind:[],sp:[],ln:[],jc:[]};
+  body.forEach(p=>{if(p.after!=null&&+p.after>130)g.sp.push(p);if(p.line!=null&&p.rule!=='exact'&&p.rule!=='atLeast'&&(+p.line>294||+p.line<234))g.ln.push(p);
+   if(p.jc&&p.jc!=='both'&&p.jc!=='distribute')g.jc.push(p);if(!(p.first&&+p.first>=600&&+p.first<=800))g.ind.push(p)});
+  const gp=(a,m)=>a.length&&add('para','warn',`${a.length}/${body.length} đoạn nội dung ${m}`,a.slice(0,3).map(p=>`<code>${ex(p.t)}</code>`).join('<br>'));
+  if(body.length){if(g.ind.length>body.length/2)gp(g.ind,'chưa thụt đầu dòng 1,27 cm');gp(g.sp,'giãn đoạn quá 6pt');gp(g.ln,'giãn dòng ngoài khoảng 1,0–1,2');gp(g.jc,'chưa căn đều hai bên')}
+  if(S.text.length>2800){if(!S.pgnum.length)add('trang','warn','Văn bản nhiều trang nhưng chưa thấy đánh số trang','');else{if(S.pgnum.includes('footer')&&!S.pgnum.includes('header'))add('trang','warn','Số trang đang ở chân trang, cần ở đầu trang (header)','');if(!S.titlePg)add('trang','warn','Trang 1 có thể đang hiện số trang','Chưa thấy "Trang đầu khác biệt"')}}
+ }
+ // thể thức
+ if(idx(/^ĐOÀN TNCS HỒ CHÍ MINH$/)<0)add('head','err','Thiếu tiêu đề "ĐOÀN TNCS HỒ CHÍ MINH"','Ở góc phải, dòng đầu trang');
+ if(!/(BAN CHẤP HÀNH|BCH|CHI ĐOÀN|LIÊN CHI|ĐẠI HỘI|PHÂN ĐOÀN|THÀNH ĐOÀN|TỈNH ĐOÀN|HUYỆN ĐOÀN|QUẬN ĐOÀN|ĐOÀN TRƯỜNG)/.test(T))add('head','err','Không thấy tên cơ quan ban hành văn bản','Ví dụ: BCH LIÊN CHI ĐOÀN KHOA …');
+ if(idx(/^\*{3}$|^\*\s?\*\s?\*$/)<0)add('head','warn','Thiếu dòng *** dưới tên cơ quan','');
+ const mso=S.text.match(/Số\s*:\s*(\d+)\s*-\s*([A-Za-zĐđ]+)\s*\/\s*([A-Za-zĐđ]+)(?:\s*-\s*([A-Za-zĐđ]+))?/);let code=null;
+ if(!mso)add('so','err','Số và ký hiệu chưa đúng dạng (hoặc chưa điền)','Dạng chuẩn: <code>Số: 245-BC/TĐTN-TCKT</code>');
+ else{code=mso[2];if(!(code in TYPE))add('so','warn',`Ký hiệu loại "${esc(code)}" không có trong danh mục`,'Dùng: '+Object.keys(TYPE).join(', '));
+  if(mso[3]!==mso[3].toUpperCase()||(mso[4]&&mso[4]!==mso[4].toUpperCase()))add('so','err','Ký hiệu cơ quan/đơn vị phải viết in hoa',esc(mso[0]));
+  else if(!AGENCY.includes(mso[3]))add('so','warn',`Ký hiệu cơ quan "${esc(mso[3])}" không có trong danh mục viết tắt`,'Hỏi Đoàn cấp trên mã đúng. Danh mục: '+AGENCY.join(', '))}
+ const md=S.text.match(/([^\n,]{2,40}),\s*ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})/i);
+ if(!md)add('ngay','err','Dòng địa điểm, ngày tháng năm chưa đúng dạng (hoặc chưa điền)',/\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}\b/.test(L.slice(0,12).map(p=>p.t).join(' '))?'Không dùng / . - thay cho chữ ngày, tháng, năm':'Dạng chuẩn: <code>Hà Nội, ngày 09 tháng 02 năm 2026</code>');
+ else{const[,pl,dd,mo]=md;const raw=md[0];if(+dd<10&&dd.length===1)add('ngay','err','Ngày dưới 10 phải có số 0 đứng trước',`<code>${esc(raw)}</code> → ngày 0${dd}`);
+  if(+mo<3&&mo.length===1)add('ngay','err','Tháng 1, 2 phải có số 0 đứng trước',`<code>${esc(raw)}</code> → tháng 0${mo}`);
+  if(/\b(TPHCM|TP\.HCM|HCM|HN|SG)\b/i.test(pl))add('ngay','warn','Địa danh viết tắt',`"${esc(pl.trim())}" nên viết "TP. Hồ Chí Minh" / "Hà Nội"`)}
+ const nl=idx(new RegExp('^('+LOAI.join('|')+')$')),cv=code==='CV'||/^V\/V/.test(lines.find(l=>/^["“]?V\/V\b/.test(l))||'');
+ if(!cv){if(nl<0)add('loai','err','Không thấy tên loại văn bản in hoa (BÁO CÁO, KẾ HOẠCH, …)','Công văn thì không ghi tên loại');
+  else{const nx=L[nl+1];if(!nx||/^[-–—]{4,}$/.test(nx.t.trim()))add('loai','err','Thiếu trích yếu nội dung ngay dưới tên loại','Ví dụ: Về việc …');
+   const dash=L.slice(nl+1,nl+4).some(p=>/^[-–—]{5,}\s*$/.test(p.t.trim()));if(!dash)add('loai','warn','Thiếu đường gạch ngang nét rời ----- dưới trích yếu','');
+   if(code&&TYPE[code]&&TYPE[code].length&&!TYPE[code].includes(lines[nl]))add('cv','err',`Ký hiệu "${code}" không khớp tên loại "${esc(lines[nl])}"`,`Ký hiệu ${code} dùng cho: ${TYPE[code].join(' / ')}`)}}
+ else{if(idx(/^["“]?V\/V\b/)<0)add('cv','err','Công văn thiếu trích yếu "V/v …" dưới số ký hiệu','');if(idx(/^KÍNH GỬI/)<0)add('cv','err','Công văn thiếu "Kính gửi:"','')}
+ const cc=L.map((p,i)=>[p,i]).filter(([p])=>/^căn cứ/i.test(p.t.trim()));
+ cc.forEach(([p],k)=>{const t=p.t.trim(),last=k===cc.length-1,end=t.slice(-1);if(last&&end!==',')add('canc','err','Căn cứ cuối cùng phải kết thúc bằng dấu phẩy ","',`<code>…${esc(t.slice(-25))}</code>`);if(!last&&end!==';')add('canc','err','Căn cứ phải kết thúc bằng dấu chấm phẩy ";"',`<code>…${esc(t.slice(-25))}</code>`)});
+ L.forEach(p=>{const m=p.t.trim().match(/^([IVX]+)\.\s+(.+)/);if(m&&m[2]!==m[2].toUpperCase()&&m[2].length<120)add('muc','err','Tiêu đề mục La Mã phải in hoa',`<code>${ex(p.t)}</code>`)});
+ if(!/(^|\n)\s*(TM\.|KT\.|TL\.|CHÁNH VĂN PHÒNG|Q\. ?TRƯỞNG|TRƯỞNG BAN|BÍ THƯ)/i.test(S.text))add('ky','err','Không thấy thể thức đề ký (TM./KT./TL.) hoặc chức vụ người ký','');
+ const ni=idx(/^NƠI NHẬN/);
+ if(ni<0)add('nn','err','Thiếu mục "Nơi nhận:"','');
+ else{const items=[];for(let k=ni+1;k<L.length&&/^-/.test(L[k].t.trim());k++)items.push(L[k].t.trim());
+  if(!items.length)add('nn','err','Nơi nhận chưa có dòng gạch đầu dòng (-)','Mỗi nơi nhận một dòng bắt đầu bằng "- "');
+  else{items.forEach((t,k)=>{const lastI=k===items.length-1,end=t.replace(/\s*\([^)]*\)\s*$/,'').slice(-1);if(lastI?end!=='.':end!==';')add('nn','err',lastI?'Dòng nơi nhận cuối phải kết thúc bằng dấu chấm "."':'Dòng nơi nhận phải kết thúc bằng ";"',`<code>${esc(t.slice(0,50))}</code>`)});
+   if(!/Lưu/i.test(items[items.length-1]))add('nn','err','Dòng cuối của Nơi nhận phải là "Lưu …"',`<code>${esc(items[items.length-1])}</code>`)}}
+ // nội dung
+ const re=/\[[^\]]*\]|\{\{.*?\}\}|\.{4,}|…{2,}|_{3,}|\bxxx+\b/gi,hits=[];S.paras.forEach((p,i)=>{let m;re.lastIndex=0;while(m=re.exec(p.t))hits.push(`đoạn ${i+1}: <code>${esc(p.t.slice(Math.max(0,m.index-18),m.index+m[0].length+10))}</code>`)});
+ if(hits.length)add('ph','err',`Còn ${hits.length} chỗ chưa điền / ghi chú của mẫu`,hits.slice(0,5).join('<br>'));
+ const ds=dates(S.text);ds.filter(x=>!x.ok).forEach(x=>add('date','err','Ngày không tồn tại: '+esc(x.raw),'Kiểm tra lại ngày/tháng'));
+ const doc=ds.find(x=>x.doc&&x.ok);if(doc)ds.filter(x=>x.ok&&!x.doc&&x.dt<doc.dt).forEach(x=>add('date','warn',`Ngày ${esc(x.raw)} sớm hơn ngày ban hành`,'Nếu là ngày diễn ra sự kiện, thường phải sau ngày ban hành'));
+ const c={d:[],s:[],c:[]};S.paras.forEach((p,i)=>{const t=p.t.trim();if(/\S {2,}\S/.test(t))c.d.push(i+1);if(/\S [,.;:!?](\s|$)/.test(t))c.s.push(i+1);if(/\p{L}[,;]\p{L}/u.test(t))c.c.push(i+1)});
+ if(c.d.length)add('typo','warn','Khoảng trắng thừa giữa các từ','Đoạn: '+c.d.slice(0,8).join(', '));if(c.s.length)add('typo','warn','Có khoảng trắng trước dấu câu','Đoạn: '+c.s.slice(0,8).join(', '));if(c.c.length)add('typo','warn','Thiếu khoảng trắng sau dấu phẩy/chấm phẩy','Đoạn: '+c.c.slice(0,8).join(', '));
+ let n=0,run=0;S.paras.forEach(p=>{run=p.t.trim()?0:run+1;if(run===3)n++});if(n)add('blank','warn','Có dòng trống liên tiếp (>2)',n+' vị trí');
+ return I}
+
+let prev=null;
+const stats=()=>{try{return JSON.parse(localStorage.getItem('gk_stats')||'{}')}catch(e){return{}}};
+function bump(I){try{const s=stats();I.forEach(i=>{const k=i.id+'|'+i.msg;if(!prev||!prev.has(k))s[i.id]=(s[i.id]||0)+1});localStorage.setItem('gk_stats',JSON.stringify(s))}catch(e){}}
+function keyVals(S){const kv=[],T=S.text;let m;
+ if(m=T.match(/Số\s*:\s*([^\n]+)/i))kv.push('Số văn bản: <b>'+esc(m[1].trim())+'</b>');if(m=T.match(/Kính gửi\s*:?\s*([^\n]+)/i))kv.push('Kính gửi: <b>'+esc(m[1].trim())+'</b>');
+ dates(T).forEach(d=>kv.push((d.doc?'Ngày ban hành: ':'Ngày: ')+'<b>'+esc(d.raw)+'</b>'));[...new Set(T.match(/\d[\d.,]*\s*(?:đồng|VNĐ|VND|đ)\b/gi)||[])].forEach(x=>kv.push('Số tiền: <b>'+esc(x)+'</b>'));
+ S.paras.map(p=>p.t.trim()).filter(p=>/^(TM|KT|TL)\./i.test(p)).forEach(c=>kv.push('Thẩm quyền ký: <b>'+esc(c)+'</b>'));return kv}
+
+function show(S){
+ CUR=S;
+ const I=check(S).sort((a,b)=>(a.sev==='err'?0:1)-(b.sev==='err'?0:1)),e=I.filter(x=>x.sev==='err').length,w=I.length-e,ok=!e;
+ const keys=new Set(I.map(i=>i.id+'|'+i.msg));let cmp='';
+ if(prev){const fixed=[...prev].filter(k=>!keys.has(k)).length,neu=[...keys].filter(k=>!prev.has(k)).length;cmp=`<p class="muted">So với lần nạp trước: đã sửa <b>${fixed}</b> lỗi${neu?`, phát sinh mới <b>${neu}</b>`:''}.</p>`}
+ bump(I);prev=keys;
+ const st=stats(),top=Object.entries(st).filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1]).slice(0,3);
+ const kv=keyVals(S);
+ $('res').innerHTML=`<div class="card"><h2><span class="num">3</span>Kết quả kiểm tra</h2>
+ <div class="gate ${ok?'good':'bad'}">${ok?'✅ Không còn lỗi bắt buộc. Sang bước xác nhận.':'⛔ Chưa nộp được: còn '+e+' lỗi bắt buộc'}</div><p class="muted">${e} lỗi bắt buộc · ${w} cảnh báo (nên xem lại)</p>${cmp}
+ ${I.map(x=>{const r=RB(x.id);return`<div class="iss ${x.sev}"><b>${x.sev==='err'?'Lỗi':'Cảnh báo'}:</b> ${x.msg}${x.where?`<div>${x.where}</div>`:''}<div><b class="k">Quy định:</b> ${esc(r.label)} (HD 29, mục ${r.ref})</div><div><b class="k">Cách sửa:</b> ${esc(r.tip)}</div></div>`}).join('')||'<p class="muted">Không phát hiện vấn đề.</p>'}
+ <p class="muted">Sửa trong Word rồi nạp lại file. Hệ thống không chỉnh sửa file của bạn.</p></div>
+ ${top.length?`<div class="card"><h2>Lỗi bạn hay gặp</h2><p class="h">Dựa trên các lần kiểm tra trước trên máy này.</p>${top.map(([id,n])=>`<div class="rule"><span style="flex:1">${esc(RB(id).label)}</span><span class="tag">${n} lần</span></div>`).join('')}</div>`:''}
+ <div class="card conf"><h2><span class="num">4</span>Tự đọc lại và xác nhận</h2><p class="h">Đối chiếu từng thông tin hệ thống trích ra từ văn bản của bạn.</p>
+ ${kv.map(k=>`<label><input type="checkbox" class="cf"> ${k}</label>`).join('')}<label><input type="checkbox" class="cf"> Tôi đã đọc toàn bộ văn bản và chịu trách nhiệm về nội dung.</label>
+ <div class="row" style="margin-top:10px"><button id="bOk" disabled>Xác nhận sẵn sàng nộp</button><span class="muted" id="okNote"></span></div><div id="fin"></div></div>`;
+ const upd=()=>{const all=[...document.querySelectorAll('.cf')].every(c=>c.checked);$('bOk').disabled=!(ok&&all);$('okNote').textContent=!ok?'Phải hết lỗi bắt buộc':!all?'Tích hết các mục':''};
+ document.querySelectorAll('.cf').forEach(c=>c.onchange=upd);upd();
+ $('bOk').onclick=()=>{$('fin').innerHTML='<div class="gate good" style="margin-top:10px">✅ Sẵn sàng. Hãy nộp đúng file .docx bạn vừa nạp (file do chính bạn soạn và sửa).</div>'}}
+
+$('fS').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('sName').textContent=f.name;
+ try{show(await parse(await f.arrayBuffer()))}catch(x){$('res').innerHTML='<div class="card"><div class="iss err">Không đọc được file: '+esc(x.message)+'. Hãy lưu lại bằng Word dạng .docx.</div></div>'}
+ e.target.value=''};
+$('bDemo').onclick=()=>{prev=null;const t=`BCH LIÊN CHI ĐOÀN KHOA CNTT\n***\nSố: ..../KH-LCĐ\nĐOÀN TNCS HỒ CHÍ MINH\nTPHCM, ngày 5 tháng 2 năm 2026\nBÁO CÁO\nTổ chức  chương trình "Ngày hội việc làm" ,diễn ra ngày 10/01/2026.\nKính gửi: [Tên đơn vị]\nCăn cứ Kế hoạch số 12 của Đoàn trường\nCăn cứ Hướng dẫn của Thành đoàn\nI. Mục đích\nKinh phí dự kiến: 15.000.000 đồng.\nNơi nhận:\n- Đoàn trường\n- Lưu`;
+ $('sName').textContent='(demo, chỉ kiểm tra thể thức & nội dung)';show({paras:t.split('\n').map(x=>({t:x,runs:[]})),text:t,fmt:false,pgnum:[],titlePg:false})};
+const mask=t=>t.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,'[email]').replace(/(\+?84|0)[\d .-]{8,12}\d/g,'[sđt]');
+$('bAI').onclick=async()=>{
+ const out=$('ai'),btn=$('bAI');
+ if(!AI_URL){out.innerHTML='<div class="iss warn">Chưa điền <code>AI_URL</code> ở đầu phần script trong index.html.</div>';return}
+ if(!CUR){out.innerHTML='<div class="iss warn">Hãy nạp văn bản ở bước 2 trước.</div>';return}
+ btn.disabled=true;$('aiNote').textContent='Đang đợi AI…';out.innerHTML='';
+ try{
+  const r=await fetch(AI_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:mask(CUR.paras.map((p,i)=>`[${i+1}] ${p.t}`).join('\n'))})});
+  if(!r.ok)throw new Error('Máy chủ trả mã '+r.status);
+  const d=await r.json(),items=Array.isArray(d)?d:(d.items||[]);
+  out.innerHTML=items.length?items.map(x=>`<div class="iss warn"><b>${esc(x.loai||'Gợi ý')}</b>${x.doan?' · đoạn '+esc(x.doan):''}<div>${esc(x.vi_sao||'')}</div><div><b class="k">Hướng sửa:</b> ${esc(x.goi_y||'')}</div></div>`).join('')+'<p class="muted">Đây là gợi ý, bạn tự cân nhắc và tự sửa.</p>':'<p class="muted">AI không thấy vấn đề nào đáng chú ý.</p>'
+ }catch(e){out.innerHTML='<div class="iss err">Không gọi được AI: '+esc(e.message)+'</div>'}
+ btn.disabled=false;$('aiNote').textContent=''};
+</script></body></html>
