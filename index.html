@@ -2,6 +2,7 @@
 <html lang="vi"><head><meta charset="utf-8"><title>Trợ lý kiểm tra văn bản Đoàn</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{--bg:#f6f6f3;--card:#fff;--tx:#1d1d1b;--mu:#6b6b66;--bd:#dcdcd5;--ac:#1f5fbf;--er:#c0392b;--wa:#b7791f;--ok:#2e7d32;--er-bg:#fdecea;--wa-bg:#fff6e0;--ok-bg:#e8f5e9;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--card:#21211f;--tx:#ecece8;--mu:#a0a09a;--bd:#3a3a36;--ac:#6ea3f5;--er:#ff8a7a;--wa:#f0b955;--ok:#7bc67e;--er-bg:#3a1f1c;--wa-bg:#37300f;--ok-bg:#1c3320;color-scheme:dark}}
@@ -25,18 +26,18 @@ input[type=file]{display:none}.row{display:flex;gap:8px;flex-wrap:wrap;align-ite
 <p class="h"><a href="data/huong-dan-29-the-thuc-van-ban-doan.pdf" target="_blank" rel="noopener">Mở văn bản quy định gốc (PDF)</a></p>
 <details><summary>Xem / bật tắt quy tắc</summary><div id="rules"></div></details></div>
 
-<div class="card"><h2><span class="num">2</span>Nạp văn bản của bạn (.docx)</h2>
-<p class="h">Sửa xong trong Word thì nạp lại, hệ thống sẽ cho biết bạn đã sửa được bao nhiêu lỗi.</p>
-<div class="row"><label class="btn">Chọn file .docx<input type="file" id="fS" accept=".docx"></label><button class="sec" id="bDemo">Chạy thử văn bản demo lỗi</button><span class="muted" id="sName"></span></div></div>
+<div class="card"><h2><span class="num">2</span>Tải văn bản lên</h2>
+<p class="h">Hỗ trợ tệp .docx và .pdf. Sửa xong thì tải lại, hệ thống sẽ cho biết bạn đã sửa được bao nhiêu lỗi. Tệp .docx cho kết quả kiểm tra đầy đủ nhất.</p>
+<div class="row"><label class="btn">Chọn tệp<input type="file" id="fS" accept=".docx,.pdf"></label><button class="sec" id="bDemo">Xem ví dụ minh họa</button><span class="muted" id="sName"></span></div></div>
 <div id="res"></div>
 
-<div class="card"><h2><span class="num">AI</span>Gợi ý từ AI (Gemini)</h2>
-<p class="h">AI đọc đối chiếu với chính văn bản quy định thể thức, gắn cờ các điểm máy khó bắt (tên cơ quan, thể thức đề ký, nơi nhận, mâu thuẫn, ý mơ hồ, văn phong, chính tả) và nêu mục căn cứ. AI không viết lại và không sửa văn bản. Số điện thoại, email được che trước khi gửi.</p>
-<div class="row"><button class="sec" id="bAI">Nhờ AI xem nội dung</button><span class="muted" id="aiNote"></span></div><div id="ai"></div></div>
+<div class="card"><h2><span class="num">5</span>Rà soát nội dung thông minh</h2>
+<p class="h">Đối chiếu văn bản với quy định thể thức và gắn cờ những điểm khó kiểm tra bằng quy tắc: tên cơ quan, thể thức đề ký, nơi nhận, mâu thuẫn số liệu, ý mơ hồ, văn phong, chính tả. Chỉ đưa ra gợi ý, không viết lại và không sửa văn bản. Email và số điện thoại được che trước khi gửi.</p>
+<div class="row"><button class="sec" id="bAI">Rà soát nội dung</button><span class="muted" id="aiNote"></span></div><div id="ai"></div></div>
 </main>
 <script>
-// ====== ĐIỀN LINK WORKER (Cloudflare) VÀO ĐÂY ======
-const AI_URL="https://van-ban-checker.annguyen-31241027631.workers.dev";
+// ====== ĐIỀN LINK WORKER (Cloudflare) ======
+const AI_URL="https://van-ban-checker.annguyen-31241027631.workers.dev"; 
 // ====================================================
 let CUR=null;
 const W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',$=id=>document.getElementById(id);
@@ -90,6 +91,38 @@ async function parse(buf){
  return{paras,text:paras.map(p=>p.t).join('\n'),fmt:true,pgnum:hdr,titlePg:!!q(sp,'titlePg'),
   pg:pz?{w:+at(pz,'w'),h:+at(pz,'h')}:null,mg:pm?Object.fromEntries(['top','bottom','left','right'].map(k=>[k,mm(at(pm,k))])):null}}
 
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',mmPt=t=>Math.round(t*25.4/72*10)/10;
+async function pdfInit(){if(pdfjsLib.GlobalWorkerOptions.workerSrc)return;const t=await(await fetch(PDFJS+'pdf.worker.min.js')).text();pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([t],{type:'text/javascript'}))}
+const fname=n=>{n=(n||'').replace(/^[A-Z]{6}\+/,'');if(!n||/^g_d\d+_f\d+$/.test(n))return null;return /times/i.test(n)?'Times New Roman':n.split(/[-,]/)[0].replace(/(PSMT|PS|MT)$/,'')};
+async function parsePdf(buf){
+ await pdfInit();
+ const doc=await pdfjsLib.getDocument({data:buf}).promise,segs=[],pn={};let pw=0,ph=0,minX=1e9,maxR=0,unk=0;
+ for(let n=1;n<=doc.numPages;n++){
+  const pg=await doc.getPage(n),vp=pg.getViewport({scale:1});if(n===1){pw=vp.width;ph=vp.height}
+  const tc=await pg.getTextContent();try{await pg.getOperatorList()}catch(e){}
+  const fn={};for(const k of Object.keys(tc.styles)){let nm='';try{nm=pg.commonObjs.get(k).name||''}catch(e){}fn[k]=nm}
+  const its=[];for(const i of tc.items){if(!i.str||!i.str.trim())continue;const t=i.transform,it={s:i.str,x:t[4],y:t[5],w:i.width,sz:Math.round(Math.hypot(t[0],t[1])*2)/2,nm:fn[i.fontName]||''};
+   if(/^\d{1,3}$/.test(i.str.trim())&&it.y>vp.height*.9&&Math.abs(it.x+it.w/2-vp.width/2)<vp.width*.15){pn[n]=1;continue}
+   minX=Math.min(minX,it.x);maxR=Math.max(maxR,it.x+it.w);its.push(it)}
+  its.sort((a,b)=>b.y-a.y||a.x-b.x);const lines=[];
+  for(const it of its){const l=lines.slice(-4).find(l=>Math.abs(l.y-it.y)<=Math.max(2,it.sz*.35));l?l.it.push(it):lines.push({y:it.y,it:[it]})}
+  for(const l of lines){l.it.sort((a,b)=>a.x-b.x);let cur=null;
+   for(const it of l.it){const gap=cur?it.x-cur.x1:0;
+    if(!cur||gap>it.sz*1.6){cur={y:l.y,x0:it.x,x1:0,sz:it.sz,t:'',runs:[],pg:n};segs.push(cur)}else if(gap>it.sz*.2&&!/\s$/.test(cur.t)&&!/^\s/.test(it.s))cur.t+=' ';
+    cur.t+=it.s;cur.x1=it.x+it.w;const f=fname(it.nm);if(!f)unk++;
+    cur.runs.push({n:it.s.length,f:f||CFG.font,s:it.sz,b:/bold|black|heavy/i.test(it.nm),i:/italic|oblique/i.test(it.nm)})}}}
+ const pc=(a,q)=>a.length?a.slice().sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor(q*a.length))]:0;
+ minX=pc(segs.filter(x=>x.t.length>15).map(x=>x.x0),.03);maxR=Math.min(pw,pc(segs.filter(x=>x.t.length>60).map(x=>x.x1),.97));
+ const rr=maxR,paras=[];let prev=null;
+ for(const sg of segs){const mk=/^(-|\+|\d+[.)]|[IVX]+\.|Căn cứ|Kính gửi|Nơi nhận|TM\.|KT\.|TL\.)/i.test(sg.t.trim());
+  if(prev&&rr>0&&prev.pg===sg.pg&&prev.x1>=rr-30&&sg.x0<=minX+6&&prev.y-sg.y<=sg.sz*1.8&&prev.sz===sg.sz&&!mk){prev.t+=' '+sg.t.trim();prev.runs.push(...sg.runs);prev.x1=sg.x1;prev.y=sg.y}
+  else{prev={...sg,runs:[...sg.runs]};paras.push(prev)}}
+ const text=paras.map(x=>x.t).join('\n');if(text.replace(/\s/g,'').length<40)throw new Error('SCAN');
+ const info=['Đây là tệp PDF: hệ thống không đo được lề trên/dưới, thụt đầu dòng, giãn dòng và căn đều hai bên. Tệp .docx cho kết quả đầy đủ hơn.'];
+ if(unk)info.push('Một số phông chữ trong PDF không đọc được tên nên chưa kiểm tra phông cho các đoạn đó.');
+ return{paras:paras.map(x=>({t:x.t,runs:x.runs})),text,fmt:true,layout:false,kind:'pdf',pages:doc.numPages,pnum1:!!pn[1],pnum2:Object.keys(pn).some(k=>k>1),pgnum:[],titlePg:false,
+  pg:{w:Math.round(pw*20),h:Math.round(ph*20)},mg:{left:mmPt(minX),right:mmPt(pw-maxR)},info}}
+
 function stat(p){const n=p.runs.reduce((a,r)=>a+r.n,0)||1,sz={};p.runs.forEach(r=>sz[r.s]=(sz[r.s]||0)+r.n);
  return{sz:+Object.entries(sz).sort((a,b)=>b[1]-a[1])[0]?.[0],b:p.runs.filter(r=>r.b).reduce((a,r)=>a+r.n,0)/n>.8,i:p.runs.filter(r=>r.i).reduce((a,r)=>a+r.n,0)/n>.8}}
 function dates(text){const o=[];let m;const a=/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/g,b=/ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})/gi;
@@ -101,7 +134,7 @@ function check(S){
  const idx=re=>lines.findIndex(l=>re.test(l));
  if(S.fmt){
   if(S.pg&&(Math.abs(S.pg.w-11906)>60||Math.abs(S.pg.h-16838)>60))add('page','err','Khổ giấy không phải A4 dọc',`Hiện ${mm(S.pg.w)}×${mm(S.pg.h)} mm, cần 210×297 mm`);
-  if(S.mg)for(const[k,l]of[['top','trên'],['bottom','dưới'],['left','trái'],['right','phải']])if(Math.abs(S.mg[k]-CFG.m[k])>CFG.tol)add('margin','err',`Lề ${l} sai`,`Hiện ${S.mg[k]} mm, chuẩn ${CFG.m[k]} mm`);
+  if(S.mg)for(const[k,l]of[['top','trên'],['bottom','dưới'],['left','trái'],['right','phải']])if(S.mg[k]!=null&&(S.kind==='pdf'&&k==='right'?S.mg[k]-CFG.m[k]<-(CFG.tol+1):Math.abs(S.mg[k]-CFG.m[k])>CFG.tol+(S.kind==='pdf'?1.5:0)))add('margin','err',`Lề ${l} sai`,`Hiện ${S.mg[k]} mm, chuẩn ${CFG.m[k]} mm`);
   const bf=L.filter(p=>p.runs.some(r=>r.f!==CFG.font));if(bf.length)add('font','err',`Có ${bf.length} đoạn dùng phông khác ${CFG.font}`,bf.slice(0,4).map(p=>`<code>${ex(p.t)}</code> (${esc([...new Set(p.runs.map(r=>r.f))].join(', '))})`).join('<br>'));
   const special=p=>COMP.some(c=>c[1].test(norm(p.t.trim())))||/^(CĂN CỨ|NƠI NHẬN|-|\*{3})/.test(norm(p.t.trim()));
   const body=L.filter(p=>p.t.trim().length>=70&&!p.num&&!special(p)&&p.runs.length);
@@ -113,8 +146,8 @@ function check(S){
   body.forEach(p=>{if(p.after!=null&&+p.after>130)g.sp.push(p);if(p.line!=null&&p.rule!=='exact'&&p.rule!=='atLeast'&&(+p.line>294||+p.line<234))g.ln.push(p);
    if(p.jc&&p.jc!=='both'&&p.jc!=='distribute')g.jc.push(p);if(!(p.first&&+p.first>=600&&+p.first<=800))g.ind.push(p)});
   const gp=(a,m)=>a.length&&add('para','warn',`${a.length}/${body.length} đoạn nội dung ${m}`,a.slice(0,3).map(p=>`<code>${ex(p.t)}</code>`).join('<br>'));
-  if(body.length){if(g.ind.length>body.length/2)gp(g.ind,'chưa thụt đầu dòng 1,27 cm');gp(g.sp,'giãn đoạn quá 6pt');gp(g.ln,'giãn dòng ngoài khoảng 1,0–1,2');gp(g.jc,'chưa căn đều hai bên')}
-  if(S.text.length>2800){if(!S.pgnum.length)add('trang','warn','Văn bản nhiều trang nhưng chưa thấy đánh số trang','');else{if(S.pgnum.includes('footer')&&!S.pgnum.includes('header'))add('trang','warn','Số trang đang ở chân trang, cần ở đầu trang (header)','');if(!S.titlePg)add('trang','warn','Trang 1 có thể đang hiện số trang','Chưa thấy "Trang đầu khác biệt"')}}
+  if(body.length&&S.layout!==false){if(g.ind.length>body.length/2)gp(g.ind,'chưa thụt đầu dòng 1,27 cm');gp(g.sp,'giãn đoạn quá 6pt');gp(g.ln,'giãn dòng ngoài khoảng 1,0–1,2');gp(g.jc,'chưa căn đều hai bên')}
+  if(S.kind==='pdf'){if(S.pages>1){if(!S.pnum2)add('trang','warn','Văn bản nhiều trang nhưng chưa thấy số trang ở đầu trang (từ trang 2)','');if(S.pnum1)add('trang','warn','Trang 1 đang hiện số trang','Trang đầu không đánh số')}}else if(S.text.length>2800){if(!S.pgnum.length)add('trang','warn','Văn bản nhiều trang nhưng chưa thấy đánh số trang','');else{if(S.pgnum.includes('footer')&&!S.pgnum.includes('header'))add('trang','warn','Số trang đang ở chân trang, cần ở đầu trang (header)','');if(!S.titlePg)add('trang','warn','Trang 1 có thể đang hiện số trang','Chưa thấy "Trang đầu khác biệt"')}}
  }
  // thể thức
  if(idx(/^ĐOÀN TNCS HỒ CHÍ MINH$/)<0)add('head','err','Thiếu tiêu đề "ĐOÀN TNCS HỒ CHÍ MINH"','Ở góc phải, dòng đầu trang');
@@ -140,9 +173,9 @@ function check(S){
  cc.forEach(([p],k)=>{const t=p.t.trim(),last=k===cc.length-1,end=t.slice(-1);if(last&&end!==',')add('canc','err','Căn cứ cuối cùng phải kết thúc bằng dấu phẩy ","',`<code>…${esc(t.slice(-25))}</code>`);if(!last&&end!==';')add('canc','err','Căn cứ phải kết thúc bằng dấu chấm phẩy ";"',`<code>…${esc(t.slice(-25))}</code>`)});
  L.forEach(p=>{const m=p.t.trim().match(/^([IVX]+)\.\s+(.+)/);if(m&&m[2]!==m[2].toUpperCase()&&m[2].length<120)add('muc','err','Tiêu đề mục La Mã phải in hoa',`<code>${ex(p.t)}</code>`)});
  if(!/(^|\n)\s*(TM\.|KT\.|TL\.|CHÁNH VĂN PHÒNG|Q\. ?TRƯỞNG|TRƯỞNG BAN|BÍ THƯ)/i.test(S.text))add('ky','err','Không thấy thể thức đề ký (TM./KT./TL.) hoặc chức vụ người ký','');
- const ni=idx(/^NƠI NHẬN/);
+ let ni=-1;lines.forEach((l,i)=>{if(/^NƠI NHẬN/.test(l))ni=i});
  if(ni<0)add('nn','err','Thiếu mục "Nơi nhận:"','');
- else{const items=[];for(let k=ni+1;k<L.length&&/^-/.test(L[k].t.trim());k++)items.push(L[k].t.trim());
+ else{const items=[];for(let k=ni+1;k<Math.min(L.length,ni+17);k++){const t=L[k].t.trim();if(/^-/.test(t)&&!/^[-–—]{4,}$/.test(t))items.push(t)}
   if(!items.length)add('nn','err','Nơi nhận chưa có dòng gạch đầu dòng (-)','Mỗi nơi nhận một dòng bắt đầu bằng "- "');
   else{items.forEach((t,k)=>{const lastI=k===items.length-1,end=t.replace(/\s*\([^)]*\)\s*$/,'').slice(-1);if(lastI?end!=='.':end!==';')add('nn','err',lastI?'Dòng nơi nhận cuối phải kết thúc bằng dấu chấm "."':'Dòng nơi nhận phải kết thúc bằng ";"',`<code>${esc(t.slice(0,50))}</code>`)});
    if(!/Lưu/i.test(items[items.length-1]))add('nn','err','Dòng cuối của Nơi nhận phải là "Lưu …"',`<code>${esc(items[items.length-1])}</code>`)}}
@@ -173,7 +206,7 @@ function show(S){
  const st=stats(),top=Object.entries(st).filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1]).slice(0,3);
  const kv=keyVals(S);
  $('res').innerHTML=`<div class="card"><h2><span class="num">3</span>Kết quả kiểm tra</h2>
- <div class="gate ${ok?'good':'bad'}">${ok?'✅ Không còn lỗi bắt buộc. Sang bước xác nhận.':'⛔ Chưa nộp được: còn '+e+' lỗi bắt buộc'}</div><p class="muted">${e} lỗi bắt buộc · ${w} cảnh báo (nên xem lại)</p>${cmp}
+ <div class="gate ${ok?'good':'bad'}">${ok?'✅ Không còn lỗi bắt buộc. Sang bước xác nhận.':'⛔ Chưa nộp được: còn '+e+' lỗi bắt buộc'}</div><p class="muted">${e} lỗi bắt buộc · ${w} cảnh báo (nên xem lại)</p>${cmp}${(S.info||[]).map(x=>`<p class="muted">${esc(x)}</p>`).join('')}
  ${I.map(x=>{const r=RB(x.id);return`<div class="iss ${x.sev}"><b>${x.sev==='err'?'Lỗi':'Cảnh báo'}:</b> ${x.msg}${x.where?`<div>${x.where}</div>`:''}<div><b class="k">Quy định:</b> ${esc(r.label)} (HD 29, mục ${r.ref})</div><div><b class="k">Cách sửa:</b> ${esc(r.tip)}</div></div>`}).join('')||'<p class="muted">Không phát hiện vấn đề.</p>'}
  <p class="muted">Sửa trong Word rồi nạp lại file. Hệ thống không chỉnh sửa file của bạn.</p></div>
  ${top.length?`<div class="card"><h2>Lỗi bạn hay gặp</h2><p class="h">Dựa trên các lần kiểm tra trước trên máy này.</p>${top.map(([id,n])=>`<div class="rule"><span style="flex:1">${esc(RB(id).label)}</span><span class="tag">${n} lần</span></div>`).join('')}</div>`:''}
@@ -185,21 +218,27 @@ function show(S){
  $('bOk').onclick=()=>{$('fin').innerHTML='<div class="gate good" style="margin-top:10px">✅ Sẵn sàng. Hãy nộp đúng file .docx bạn vừa nạp (file do chính bạn soạn và sửa).</div>'}}
 
 $('fS').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('sName').textContent=f.name;
- try{show(await parse(await f.arrayBuffer()))}catch(x){$('res').innerHTML='<div class="card"><div class="iss err">Không đọc được file: '+esc(x.message)+'. Hãy lưu lại bằng Word dạng .docx.</div></div>'}
+ const fail=m=>$('res').innerHTML='<div class="card"><div class="iss err">'+m+'</div></div>';
+ try{const buf=await f.arrayBuffer();
+  if(/\.pdf$/i.test(f.name))show(await parsePdf(buf));
+  else if(/\.docx$/i.test(f.name))show(await parse(buf));
+  else if(/\.doc$/i.test(f.name))fail('Định dạng .doc (Word cũ) chưa được hỗ trợ. Hãy lưu lại thành .docx hoặc xuất ra PDF rồi tải lên.');
+  else fail('Chỉ hỗ trợ tệp .docx và .pdf.')
+ }catch(x){fail(x.message==='SCAN'?'PDF này là ảnh chụp hoặc bản quét nên không đọc được chữ. Hãy xuất PDF trực tiếp từ Word (Lưu thành → PDF) rồi tải lên.':'Không đọc được tệp: '+esc(x.message))}
  e.target.value=''};
 $('bDemo').onclick=()=>{prev=null;const t=`BCH LIÊN CHI ĐOÀN KHOA CNTT\n***\nSố: ..../KH-LCĐ\nĐOÀN TNCS HỒ CHÍ MINH\nTPHCM, ngày 5 tháng 2 năm 2026\nBÁO CÁO\nTổ chức  chương trình "Ngày hội việc làm" ,diễn ra ngày 10/01/2026.\nKính gửi: [Tên đơn vị]\nCăn cứ Kế hoạch số 12 của Đoàn trường\nCăn cứ Hướng dẫn của Thành đoàn\nI. Mục đích\nKinh phí dự kiến: 15.000.000 đồng.\nNơi nhận:\n- Đoàn trường\n- Lưu`;
- $('sName').textContent='(demo, chỉ kiểm tra thể thức & nội dung)';show({paras:t.split('\n').map(x=>({t:x,runs:[]})),text:t,fmt:false,pgnum:[],titlePg:false})};
+ $('sName').textContent='Văn bản minh họa';show({paras:t.split('\n').map(x=>({t:x,runs:[]})),text:t,fmt:false,pgnum:[],titlePg:false})};
 const mask=t=>t.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,'[email]').replace(/(\+?84|0)[\d .-]{8,12}\d/g,'[sđt]');
 $('bAI').onclick=async()=>{
  const out=$('ai'),btn=$('bAI');
- if(!AI_URL){out.innerHTML='<div class="iss warn">Chưa điền <code>AI_URL</code> ở đầu phần script trong index.html.</div>';return}
- if(!CUR){out.innerHTML='<div class="iss warn">Hãy nạp văn bản ở bước 2 trước.</div>';return}
- btn.disabled=true;$('aiNote').textContent='Đang đợi AI…';out.innerHTML='';
+ if(!CUR){out.innerHTML='<div class="iss warn">Hãy tải văn bản lên ở bước 2 trước.</div>';return}
+ if(!AI_URL){console.warn('Chưa điền AI_URL trong index.html');out.innerHTML='<div class="iss warn">Dịch vụ rà soát nội dung hiện chưa khả dụng.</div>';return}
+ btn.disabled=true;$('aiNote').textContent='Đang rà soát…';out.innerHTML='';
  try{
   const r=await fetch(AI_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:mask(CUR.paras.map((p,i)=>`[${i+1}] ${p.t}`).join('\n'))})});
-  if(!r.ok)throw new Error('Máy chủ trả mã '+r.status);
+  if(!r.ok)throw new Error('mã '+r.status);
   const d=await r.json(),items=Array.isArray(d)?d:(d.items||[]);
-  out.innerHTML=items.length?items.map(x=>`<div class="iss warn"><b>${esc(x.loai||'Gợi ý')}</b>${x.doan?' · đoạn '+esc(x.doan):''}<div>${esc(x.vi_sao||'')}</div>${x.can_cu?`<div><b class="k">Căn cứ:</b> HD 29, mục ${esc(x.can_cu)}</div>`:''}<div><b class="k">Hướng sửa:</b> ${esc(x.goi_y||'')}</div></div>`).join('')+'<p class="muted">Đây là gợi ý, bạn tự cân nhắc và tự sửa.</p>':'<p class="muted">AI không thấy vấn đề nào đáng chú ý.</p>'
- }catch(e){out.innerHTML='<div class="iss err">Không gọi được AI: '+esc(e.message)+'</div>'}
+  out.innerHTML=items.length?items.map(x=>`<div class="iss warn"><b>${esc(x.loai||'Gợi ý')}</b>${x.doan?' · đoạn '+esc(x.doan):''}<div>${esc(x.vi_sao||'')}</div>${x.can_cu?`<div><b class="k">Căn cứ:</b> HD 29, mục ${esc(x.can_cu)}</div>`:''}<div><b class="k">Hướng sửa:</b> ${esc(x.goi_y||'')}</div></div>`).join('')+'<p class="muted">Đây là gợi ý để bạn cân nhắc và tự sửa.</p>':'<p class="muted">Không phát hiện điểm nào đáng chú ý.</p>'
+ }catch(e){out.innerHTML='<div class="iss err">Không kết nối được dịch vụ rà soát ('+esc(e.message)+'). Vui lòng thử lại sau.</div>'}
  btn.disabled=false;$('aiNote').textContent=''};
 </script></body></html>
