@@ -22,6 +22,7 @@ input[type=file]{display:none}.row{display:flex;gap:8px;flex-wrap:wrap;align-ite
 
 <div class="card"><h2><span class="num">1</span>Bộ quy tắc đang áp dụng</h2>
 <p class="h">Nguồn: Hướng dẫn 29-HD/TWĐTN-VP về thể thức văn bản của Đoàn TNCS Hồ Chí Minh. Có thể tắt quy tắc không cần.</p>
+<p class="h"><a href="data/huong-dan-29-the-thuc-van-ban-doan.pdf" target="_blank" rel="noopener">Mở văn bản quy định gốc (PDF)</a></p>
 <details><summary>Xem / bật tắt quy tắc</summary><div id="rules"></div></details></div>
 
 <div class="card"><h2><span class="num">2</span>Nạp văn bản của bạn (.docx)</h2>
@@ -30,7 +31,7 @@ input[type=file]{display:none}.row{display:flex;gap:8px;flex-wrap:wrap;align-ite
 <div id="res"></div>
 
 <div class="card"><h2><span class="num">AI</span>Gợi ý từ AI (Gemini)</h2>
-<p class="h">AI chỉ gắn cờ mâu thuẫn, ý mơ hồ, văn phong, chính tả và giải thích vì sao. AI không viết lại và không sửa văn bản. Số điện thoại, email được che trước khi gửi.</p>
+<p class="h">AI đọc đối chiếu với chính văn bản quy định thể thức, gắn cờ các điểm máy khó bắt (tên cơ quan, thể thức đề ký, nơi nhận, mâu thuẫn, ý mơ hồ, văn phong, chính tả) và nêu mục căn cứ. AI không viết lại và không sửa văn bản. Số điện thoại, email được che trước khi gửi.</p>
 <div class="row"><button class="sec" id="bAI">Nhờ AI xem nội dung</button><span class="muted" id="aiNote"></span></div><div id="ai"></div></div>
 </main>
 <script>
@@ -198,7 +199,7 @@ $('bAI').onclick=async()=>{
   const r=await fetch(AI_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:mask(CUR.paras.map((p,i)=>`[${i+1}] ${p.t}`).join('\n'))})});
   if(!r.ok)throw new Error('Máy chủ trả mã '+r.status);
   const d=await r.json(),items=Array.isArray(d)?d:(d.items||[]);
-  out.innerHTML=items.length?items.map(x=>`<div class="iss warn"><b>${esc(x.loai||'Gợi ý')}</b>${x.doan?' · đoạn '+esc(x.doan):''}<div>${esc(x.vi_sao||'')}</div><div><b class="k">Hướng sửa:</b> ${esc(x.goi_y||'')}</div></div>`).join('')+'<p class="muted">Đây là gợi ý, bạn tự cân nhắc và tự sửa.</p>':'<p class="muted">AI không thấy vấn đề nào đáng chú ý.</p>'
+  out.innerHTML=items.length?items.map(x=>`<div class="iss warn"><b>${esc(x.loai||'Gợi ý')}</b>${x.doan?' · đoạn '+esc(x.doan):''}<div>${esc(x.vi_sao||'')}</div>${x.can_cu?`<div><b class="k">Căn cứ:</b> HD 29, mục ${esc(x.can_cu)}</div>`:''}<div><b class="k">Hướng sửa:</b> ${esc(x.goi_y||'')}</div></div>`).join('')+'<p class="muted">Đây là gợi ý, bạn tự cân nhắc và tự sửa.</p>':'<p class="muted">AI không thấy vấn đề nào đáng chú ý.</p>'
  }catch(e){out.innerHTML='<div class="iss err">Không gọi được AI: '+esc(e.message)+'</div>'}
  btn.disabled=false;$('aiNote').textContent=''};
 </script></body></html>
