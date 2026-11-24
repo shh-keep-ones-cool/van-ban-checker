@@ -1,4 +1,3 @@
-// Vercel Serverless Function: /api/review. API key nằm trong Environment Variable GEMINI_API_KEY (không nằm trong code).
 const MODEL = "gemini-3.5-flash";
 let rulesCache = null;
 
